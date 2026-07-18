@@ -7,6 +7,8 @@ using UnityEngine.UI;
 
 public class GameManager : MonoBehaviourPunCallbacks
 {
+    static public GameManager Inst;
+
     const int MAX_CHAT = 50; // Ã¤ÆÃ ÃÖ´ë °¹¼ö
 
     [SerializeField] private PhotonView pv;
@@ -17,6 +19,13 @@ public class GameManager : MonoBehaviourPunCallbacks
 
     private List<string> m_MsgList = new List<string>();
     private bool bEnter = false;
+    private Player player;
+
+    private void Awake()
+    {
+        Inst = this;
+        CreateHero();
+    }
 
     private void Start()
     {
@@ -152,5 +161,28 @@ public class GameManager : MonoBehaviourPunCallbacks
         pv.RPC("LogMsg", RpcTarget.AllBuffered, msg, true);
 
         InputFdChat.text = "";
+    }
+
+    private void CreateHero()
+    {
+        Vector3 hPos = Vector3.zero;
+        Vector3 addPos = Vector3.zero;
+
+        GameObject hPosObj = GameObject.Find("HeroSpawnPos");
+        if (hPosObj != null)
+        {
+            // 10m ÀÌ³» ·£´ý ½ºÆù
+            addPos.x = Random.Range(-5.0f, 5.0f);
+            addPos.z = Random.Range(-5.0f, 5.0f);
+            hPos = hPosObj.transform.position + addPos;
+
+            //Resources¿¡ »©³ù´ø "HeroPrefab" ÇÁ¸®ÆÕ
+            PhotonNetwork.Instantiate("Player", hPos, Quaternion.identity, 0);
+        }
+    }
+
+    public void SetPlayer(Player player)
+    {
+        player = this.player;
     }
 }

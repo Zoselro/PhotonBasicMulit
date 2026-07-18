@@ -1298,6 +1298,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   pv: {fileID: 856268387}
   m_BackBtn: {fileID: 1802182879}
+  InputFdChat: {fileID: 0}
   txtLogMsg: {fileID: 0}
 --- !u!4 &856268386
 Transform:
