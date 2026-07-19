@@ -21,6 +21,9 @@ public class GameManager : MonoBehaviourPunCallbacks
     private bool bEnter = false;
     private Player player;
 
+    private bool is_Conversating; // 채팅 중인지 여부를 나타내는 변수
+    public bool Is_Conversating => is_Conversating;
+
     private void Awake()
     {
         Inst = this;
@@ -50,15 +53,16 @@ public class GameManager : MonoBehaviourPunCallbacks
         if (Input.GetKeyUp(KeyCode.Return))
         {// 엔터키를 누르면 인풋 필드 활성화
             bEnter = !bEnter;
-
             if (bEnter)
             {
+                is_Conversating = true;
                 InputFdChat.gameObject.SetActive(true);
                 InputFdChat.ActivateInputField(); // <--- 키보드 커서 입력 상자 쪽으로 가게 만들어 줌
             }
             else
             {
                 InputFdChat.gameObject.SetActive(false);
+                is_Conversating = false;
                 if (!string.IsNullOrEmpty(InputFdChat.text.Trim()))
                 {
                     BroadcastingChat();
@@ -177,7 +181,7 @@ public class GameManager : MonoBehaviourPunCallbacks
             hPos = hPosObj.transform.position + addPos;
 
             //Resources에 빼놨던 "HeroPrefab" 프리팹
-            PhotonNetwork.Instantiate("Player", hPos, Quaternion.identity, 0);
+            PhotonNetwork.Instantiate("HeroPrefab", hPos, Quaternion.identity, 0);
         }
     }
 

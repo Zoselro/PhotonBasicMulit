@@ -117,7 +117,7 @@ public class Camera_Ctrl : MonoBehaviour
 
         m_BuffPos = m_TargetPos + (m_CurrentRotation * m_BasicPos);
 
-        transform.position = m_BuffPos; //<-- 카메라의 직각 좌표계 기준의 위치
+        transform.position = m_BuffPos; //<-- 카메라의  직각 좌표계 기준의 위치
         transform.LookAt(m_TargetPos);
 
     }//void LateUpdate()
