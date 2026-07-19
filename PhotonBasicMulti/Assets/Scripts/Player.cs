@@ -1,6 +1,7 @@
 ﻿using Photon.Pun;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.UI;
 
 public enum AnimState
 {
@@ -25,6 +26,7 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
     [SerializeField] private float jumpPower;
     [SerializeField] private PhotonView pv;
     [SerializeField] private NavMeshAgent agent;
+    [SerializeField] private Text id;
 
     // [삭제] Rigidbody 컴포넌트 변수 제거
 
@@ -65,6 +67,7 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
 
     bool m_IsJump; // 원격 플레이어의 점프 상태 정보를 수신받아 저장할 변수
     bool m_KeepMovingAfterJump; // 원격 플레이어의 점프 후 이동 유지 상태 정보를 수신받아 저장할 변수
+    string m_Id = ""; // 원격 플레이어의 ID 정보를 수신받아 저장할 변수
 
     private void Awake()
     {
@@ -74,7 +77,10 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
         {
             Camera_Ctrl a_CamCtrl = Camera.main.GetComponent<Camera_Ctrl>();
             if (a_CamCtrl != null)
+            {
                 a_CamCtrl.InitCamera(this.gameObject);
+                id.text = PhotonNetwork.LocalPlayer.NickName;
+            }
         }
     }
 
@@ -170,14 +176,14 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
             if (isDodge)
                 rotation = dodgeRotation;
 
-            if(!isJump) // 점프 중이 아닐 때만 이동 애니메이션 상태 변경
+            if(!isJump && !isDodge) // 점프와 회피 중이 아닐 때만 이동 애니메이션 상태 변경
                 ChangeAnimState(AnimState.move);
         }
         else
         {
             rotation = Vector3.zero;
             rotation_value = Vector3.zero;
-            if(!isJump) // 점프 중이 아닐 때만 이동 애니메이션 상태 변경
+            if(!isJump && !isDodge) // 점프와 회피 중이 아닐 때만 이동 애니메이션 상태 변경
                 ChangeAnimState(AnimState.idle);
         }
     }
@@ -344,7 +350,7 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
             stream.SendNext((int)m_CurState);
             stream.SendNext(isJump);
             stream.SendNext(keepMovingAfterJump);
-            stream.SendNext(isDodge);
+            stream.SendNext(id.text);
         }
         else // 원격 플레이어의 위치 정보 수신
         {
@@ -353,6 +359,9 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
             m_CurState = (AnimState)stream.ReceiveNext();
             m_IsJump = (bool)stream.ReceiveNext();
             m_KeepMovingAfterJump = (bool)stream.ReceiveNext();
+            m_Id = (string)stream.ReceiveNext();
+
+            id.text = m_Id;
 
             if (m_IsJump || m_KeepMovingAfterJump)
             {

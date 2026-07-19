@@ -14,8 +14,7 @@ public class GameManager : MonoBehaviourPunCallbacks
     [SerializeField] private PhotonView pv;
     [SerializeField] private Button m_BackBtn; // 룸 나가기 버튼
     [SerializeField] private TMP_InputField InputFdChat; // 채팅 입력 필드
-
-    [SerializeField] TextMeshProUGUI txtLogMsg;
+    [SerializeField] private TextMeshProUGUI txtLogMsg;
 
     private List<string> m_MsgList = new List<string>();
     private bool bEnter = false;
