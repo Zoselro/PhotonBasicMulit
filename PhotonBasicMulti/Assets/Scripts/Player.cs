@@ -16,7 +16,8 @@ public enum AnimState
     move_B,
     count,
     jump,
-    dodge
+    dodge,
+    hit
 }
 
 public class Player : MonoBehaviourPunCallbacks, IPunObservable
@@ -24,16 +25,19 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
     [Header("Options")]
     [SerializeField] private float speed;
     [SerializeField] private float jumpPower;
+    [SerializeField] private float MaxHp;
+
+    [Header("Components")]
     [SerializeField] private PhotonView pv;
     [SerializeField] private NavMeshAgent agent;
     [SerializeField] private Text id;
-
-    // [삭제] Rigidbody 컴포넌트 변수 제거
+    [SerializeField] private Image ImgHpbar;
 
     private float velocity;
     private float baseSpeed;
     private float m_MvDelay = 0.0f;
     private float h = 0, v = 0; // 이동 입력 값 저장용 변수
+   [SerializeField] private float CurHp;
 
     //--- Animator 관련 변수
     Animator m_Animator = null;
@@ -47,8 +51,8 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
     [SerializeField] private bool isDodge;
     [SerializeField] private bool keepMovingAfterDodge;
     [SerializeField] private bool keepMovingAfterJump;
-    [SerializeField] private bool isAttack;
     [SerializeField] private bool isDead;
+    [SerializeField] private bool isChat;
 
     private Vector3 rotation;
     private Vector3 rotation_value;
@@ -66,8 +70,13 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
     Quaternion CurRot = Quaternion.identity; // 원격 플레이어의 회전 정보를 수신받아 저장할 변수
 
     bool m_IsJump; // 원격 플레이어의 점프 상태 정보를 수신받아 저장할 변수
-    bool m_KeepMovingAfterJump; // 원격 플레이어의 점프 후 이동 유지 상태 정보를 수신받아 저장할 변수
     string m_Id = ""; // 원격 플레이어의 ID 정보를 수신받아 저장할 변수
+    private float NetHp; // 원격 플레이어의 HP 정보를 수신받아 저장할 변수
+
+    GameObject[] m_EnemyList = null;
+    Vector3 m_CacTgVec = Vector3.zero;  //타겟까지의 거리 계산용 변수
+    float m_AttackDist = 1.9f;          //주인공의 공격거리
+
 
     private void Awake()
     {
@@ -86,28 +95,26 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
 
     private void Start()
     {
+        CurHp = MaxHp;
+        baseSpeed = speed;
         if (pv.IsMine)
+        {
             GameManager.Inst.SetPlayer(this);
+        }
         m_Animator = this.GetComponent<Animator>();
     }
 
     void Update()
     {
         if (isDead) return;
-        if (GameManager.Inst.Is_Conversating) return;
 
         if (pv.IsMine) // 자신이 조종하는 캐릭터일 때만 이동 처리
         {
-            baseSpeed = speed;
+            ApplyGravity(); // 수동 중력 적용
+            Move();
 
-            // [수정] 죽지 않았을 때만 이동 로직을 처리합니다.
-            if (!isDead)
-            {
-                ApplyGravity(); // 수동 중력 적용
-                Move();
-            }
-
-            UpdateMouseLook(); // 마우스 시선 처리
+            //UpdateMouseLook(); // 마우스 시선 처리
+            AttackOrder();
             CheckMovementInput(); // 이동 입력 체크
             CheckJumpInput(); // 점프 입력 체크
             CheckDodgeInput(); // 회피 입력 체크
@@ -124,7 +131,9 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
             }
             ChangeAnimState(m_CurState); // 원격지 아바타들은 여기서 애니메이션 동기화
             transform.rotation = Quaternion.Slerp(transform.rotation, CurRot, Time.deltaTime * 10.0f);
+            Remote_TakeDamage();
         }
+
     }
 
     private void ApplyGravity()
@@ -154,6 +163,21 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
 
     private void CheckMovementInput()
     {
+        // 채팅 중이라면 이동 입력을 무시하고 idle 상태로 돌린 뒤 리턴
+        if (GameManager.Inst.Is_Conversating)
+        {
+            h = 0f;
+            v = 0f;
+            rotation = Vector3.zero;
+            rotation_value = Vector3.zero;
+
+            // 점프나 회피, 공격 중이 아닐 때만 안전하게 idle로 변경
+            if (!isJump && !isDodge && !IsAttack())
+                ChangeAnimState(AnimState.idle);
+
+            return;
+        }
+
         h = Input.GetAxisRaw("Horizontal");
         v = Input.GetAxisRaw("Vertical");
 
@@ -183,14 +207,15 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
         {
             rotation = Vector3.zero;
             rotation_value = Vector3.zero;
-            if(!isJump && !isDodge) // 점프와 회피 중이 아닐 때만 이동 애니메이션 상태 변경
+
+            if(!isJump && !isDodge && !IsAttack()) // 점프와 회피 중이 아닐 때만 이동 애니메이션 상태 변경
                 ChangeAnimState(AnimState.idle);
         }
     }
 
     private void CheckJumpInput()
     {
-        if (Input.GetKeyDown(KeyCode.Space) && !isJump && !isDodge && !isAttack)
+        if (Input.GetKeyDown(KeyCode.Space) && !isJump && !isDodge && !IsAttack())
         {
             yVelocity = jumpPower; // 순간적인 위쪽 속도 부여
             isJump = true;
@@ -207,7 +232,7 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
 
     private void CheckDodgeInput()
     {
-        if (Input.GetKeyDown(KeyCode.LeftControl) && rotation != Vector3.zero && !isJump && !isDodge && !isAttack)
+        if (Input.GetKeyDown(KeyCode.LeftControl) && rotation != Vector3.zero && !isJump && !isDodge && !IsAttack())
         {
             dodgeMoveDir = rotation;
             dodgeRotation = rotation;
@@ -235,7 +260,7 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
             return;
         }
 
-        if (isAttack && !isJump && !isDodge) // 캐릭터가 점프 또는 회피상태가 아닐 경우 공격적용
+        if (IsAttack() && !isJump && !isDodge) // 캐릭터가 점프 또는 회피상태가 아닐 경우 공격적용
         {
             // 공격 중에는 수평 이동을 제한하고 Y축(중력/점프)만 반영
             transform.position += new Vector3(0f, yVelocity * Time.deltaTime, 0f);
@@ -256,7 +281,7 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
             if (jumpMoveDir != Vector3.zero)
                 transform.LookAt(transform.position + new Vector3(jumpMoveDir.x, 0f, jumpMoveDir.z));
         }
-        else // Shift를 눌렀을 경우 일반 스피드의 30% 속도만큼 감. 아니면 100% 속도 유지
+        else// Shift를 눌렀을 경우 일반 스피드의 30% 속도만큼 감. 아니면 100% 속도 유지
         {
             velocity = Input.GetKey(KeyCode.LeftShift) ? baseSpeed * 0.3f : baseSpeed;
             moveVector = new Vector3(rotation.x * velocity, 0f, rotation.z * velocity);
@@ -264,26 +289,73 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
                 transform.LookAt(transform.position + new Vector3(rotation.x, 0f, rotation.z));
         }
 
+
         // 수평 이동(X, Z)에 Y축 속도(점프/중력)를 병합하여 좌표 이동
         moveVector.y = yVelocity;
         transform.position += moveVector * Time.deltaTime;
     }
 
-    public void UpdateMouseLook()
+    public void Event_AttHit()
     {
-        if (Input.GetMouseButton(0) && !isDodge && !isDead && !isJump)
+        m_EnemyList = GameObject.FindGameObjectsWithTag("Enemy");
+        int iCount = m_EnemyList.Length;
+        float fCacLen = 0.0f;
+        Vector3 effPos = Vector3.zero;
+
+        //--- 주변 모든 몬스터를 찾아서 데미지를 준다.(범위 공격)
+        for (int i = 0; i < iCount; i++)
         {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            RaycastHit rayHit;
-            if (Physics.Raycast(ray, out rayHit, 100))
-            {
-                Vector3 nextVec = rayHit.point - transform.position;
-                nextVec.y = 0f;
-                if (nextVec != Vector3.zero)
-                    transform.LookAt(transform.position + nextVec);
-            }
+            m_CacTgVec = m_EnemyList[i].transform.position - transform.position;
+            fCacLen = m_CacTgVec.magnitude;
+            m_CacTgVec.y = 0.0f;
+
+            //공격각도 안에 있는 경우
+            //45도 정도 범위 밖에 있다면 뜻
+            if (Vector3.Dot(transform.forward, m_CacTgVec.normalized) < 0.45f)
+                continue;
+
+            //공격 거리 밖에 있는 경우
+            if (m_AttackDist + 0.1f < fCacLen)
+                continue;
+
+            m_EnemyList[i].GetComponent<Monster_Ctrl>().TakeDamage(this.gameObject, 20f);
         }
-    }
+        //--- 주변 모든 몬스터를 찾아서 데미지를 준다.(범위 공격)
+
+    }//public void Event_AttHit()
+
+    void Event_AttFinish()
+    {
+        if (!pv.IsMine) // IsMine 아니면 공격 조작 금지
+            return;
+
+        //Attack 상태일 때는 Attack상태로 끝나야 한다.
+        if (m_CurState != AnimState.attack)
+            return;
+
+        ChangeAnimState(AnimState.idle);
+        
+    }//void Event_AttFinish()
+
+    private void AttackOrder()
+    {
+        if (!pv.IsMine) // IsMine 아니면 공격 조작 금지
+            return;
+
+        if (IsAttack() == false && Input.GetMouseButton(0))  //공격중이거나 스킬 사용중이 아닐 때만... 
+        {
+            //키보드 컨트롤로 이동 중이고
+            //공격키를 연타해서 누르면 달리는 애니메이션에 잠깐동안
+            //애니메이션 보간 때문에 공격 애니가 끼어드는 문제가 발생한다.
+            //<-- 이런 현상에 대한 예외처리
+            if ((0.0f != h || 0.0f != v) )
+            {
+                return;
+            }
+            ChangeAnimState(AnimState.attack);
+
+        }//if(IsAttack() == false)  //공격중이거나 스킬 사용중이 아닐 때만... 
+    }//public void AttackOrder()
 
     //현재 공격 중인지 확인하는 메서드
     public bool IsAttack()
@@ -296,23 +368,6 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
     {
         return m_CurState == AnimState.dodge;
     }
-
-    public void AttackOrder()
-    {
-        if (!pv.IsMine) // IsMine 아니면 공격 조작 금지
-            return;
-
-        if (IsAttack() == false)  //공격중이거나 스킬 사용중이 아닐 때만... 
-        {
-            //공격키를 연타해서 누르면 달리는 애니메이션에 잠깐동안
-            //애니메이션 보간 때문에 공격 애니가 끼어드는 문제가 발생한다.
-            //<-- 이런 현상에 대한 예외처리
-            if ((0.0f != h || 0.0f != v))
-                return;
-
-            ChangeAnimState(AnimState.attack);
-        }//if(IsAttack() == false)  //공격중이거나 스킬 사용중이 아닐 때만... 
-    }//public void AttackOrder()
 
     //--- 애니메이션 상태 변경 메서드
     public void ChangeAnimState(AnimState newState,
@@ -340,9 +395,58 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
         m_PreState = newState;
         m_CurState = newState;
 
-    }//public void ChangeAnimState(AnimState newState,
+    }
 
-    //애니메이션 상태 업데이트 메서드
+    public void TakeDamage(float Damage)
+    {
+        if (CurHp <= 0.0f)
+            return;
+        if (pv.IsMine)
+        {
+            CurHp -= Damage;
+            if (CurHp < 0.0f)
+                CurHp = 0.0f;
+            ImgHpbar.fillAmount = CurHp / MaxHp;
+        }
+
+        Vector3 cacPos = this.transform.position;
+        cacPos.y += 2.65f;
+
+        if (pv.IsMine)
+        {
+            if (CurHp <= 0.0f)
+            {
+                Die();   //사망처리
+            }
+        }
+    }
+
+
+    private void Die()
+    {
+        if (pv.IsMine)
+        {
+            Debug.Log("주인공 사망");
+            isDead = true;
+        }
+    }
+
+    private void Remote_TakeDamage() // 원격지 컴퓨터에서 Hp 동기화 함수
+    {
+        if (0.0f < CurHp)
+        {
+            CurHp = NetHp; // 원격 플레이어의 체력 값을 수신 받은 NetHp로 업데이트
+
+            // Image UI항목의 fillAmount을 속성을 조절해 생명 게이지값 조정
+            ImgHpbar.fillAmount = CurHp / (float)MaxHp;
+
+            if (CurHp <= 0.0f) // 사망 처리는 한 번 만 호출되기 하기 위함.
+            {
+                CurHp = 0.0f;
+                //Die();   //사망처리
+            }
+        }
+    }
 
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
     {
@@ -355,8 +459,8 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
             stream.SendNext(transform.rotation);
             stream.SendNext((int)m_CurState);
             stream.SendNext(isJump);
-            stream.SendNext(keepMovingAfterJump);
             stream.SendNext(id.text);
+            stream.SendNext(CurHp);
         }
         else // 원격 플레이어의 위치 정보 수신
         {
@@ -364,12 +468,12 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
             CurRot = (Quaternion)stream.ReceiveNext();
             m_CurState = (AnimState)stream.ReceiveNext();
             m_IsJump = (bool)stream.ReceiveNext();
-            m_KeepMovingAfterJump = (bool)stream.ReceiveNext();
             m_Id = (string)stream.ReceiveNext();
+            NetHp = (float)stream.ReceiveNext();
 
             id.text = m_Id;
 
-            if (m_IsJump || m_KeepMovingAfterJump)
+            if (m_IsJump)
             {
                 agent.updatePosition = false; // 점프 중에는 NavMeshAgent 위치 업데이트를 끔
             }
