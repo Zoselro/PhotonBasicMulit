@@ -56,6 +56,8 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     {
         if (pv.IsMine) // 이 몬스터의 소유권을 가진 컴퓨터만 AI를 연산함
         {
+            if (CurHp <= 0.0f) return; // 사망 시 AI 중지
+
             // 0.2초마다 타겟팅 상태를 갱신 (매 프레임 OverlapSphere를 돌리면 렉 유발)
             targetCheckTimer += Time.deltaTime;
             if (targetCheckTimer >= targetCheckInterval)
@@ -69,12 +71,14 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             {
                 nav.SetDestination(m_AggroTarget.position);
                 nav.isStopped = false; // 브레이크 해제, 전진!
+                ChangeAnim(AnimState.trace);
             }
             else
             {
                 // 타겟이 없거나 범위 밖이면 제자리에 정지
                 if (nav.enabled)
                 {
+                    ChangeAnim(AnimState.idle);
                     nav.isStopped = true;
                 }
             }
@@ -162,7 +166,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         // 1. 현재 상태와 요청된 상태가 같다면 중복 재생 방지를 위해 리턴
         if (m_PreState == newState)
             return;
-
+        Debug.Log($"newState : {newState}");
         // 2. 레거시 Animation 컴포넌트와 상수 관리용 스크립트가 모두 있는지 검사
         if (m_RefAnimation != null)
         {
@@ -193,6 +197,12 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         }
     }
 
+
+    //현재 공격 중인지 확인하는 메서드
+    public bool IsWait()
+    {
+        return m_CurState == AnimState.attack || m_CurState == AnimState.hit || m_CurState == AnimState.die;
+    }
     public void TakeDamage(GameObject Attacker, float Damage)
     {
         if (CurHp <= 0.0f)
@@ -234,11 +244,10 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         {
             CurHp = NetHp; // 원격 플레이어의 Monster의 hp를 수신 받은 hp로 업데이트
             ImgHpbar.fillAmount = CurHp / (float)MaxHp; // hp 바 업데이트
-            ChangeAnim(AnimState.hit);
+
             if (CurHp <= 0.0f)
             {
                 CurHp = 0.0f;
-                ChangeAnim(AnimState.die, 0.1f); // 사망 애니메이션 재생
             }
         }
         else
