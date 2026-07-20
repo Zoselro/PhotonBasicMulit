@@ -11,6 +11,18 @@ public enum MonType
     Count
 }
 
+[System.Serializable]
+public class Anim
+{
+    public AnimationClip Idle;
+    public AnimationClip Move;
+    public AnimationClip Attack1;
+    public AnimationClip Attack2;
+    public AnimationClip Skill1;
+    public AnimationClip Skill2;
+    public AnimationClip Die;
+}
+
 public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 {
     [Header("Components")]
@@ -27,7 +39,8 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     [Header("Options")]
     [SerializeField] float MaxHp = 100;
     [SerializeField] private float detectRange = 10f; // 감지 범위 (10m)
-    
+
+
     //--- Hp 바 표시
     float CurHp;
     float NetHp;
@@ -35,7 +48,9 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     //--- Hp 바 표시
 
     //--- 애니메이션
-    [SerializeField] Animation m_RefAnimation = null;
+    [SerializeField] private Animator m_RefAnimator = null;
+    private Anim anim;
+    [SerializeField] private Animation m_RefAnimation = null;
 
     AnimState m_PreState = AnimState.idle; //애니메이션 변경을 위한 함수 
     AnimState m_CurState = AnimState.idle; //애니메이션 변경을 위한 변수
@@ -48,7 +63,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     bool isFirstUpdate = true;
     private void Start()
     {
-        m_RefAnimation = GetComponent<Animation>();
+        m_RefAnimator = GetComponent<Animator>();
         CurHp = MaxHp;
     }
 
@@ -161,42 +176,84 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         }
     }
 
+    //void ChangeAnim(AnimState newState, float CrossTime = 0.0f)
+    //{
+    //    // 1. 현재 상태와 요청된 상태가 같다면 중복 재생 방지를 위해 리턴
+    //    if (m_PreState == newState)
+    //        return;
+    //    Debug.Log($"newState : {newState}");
+    //    // 2. 레거시 Animation 컴포넌트와 상수 관리용 스크립트가 모두 있는지 검사
+    //    if (m_RefAnimation != null)
+    //    {
+    //        // 기본값은 IDLE로 설정 (상수이므로 '클래스명.상수명'으로 접근)
+    //        string strAnim = Animation_Test.IDLE;
+
+    //        // 각 상태(Enum)에 맞는 애니메이션 파일 이름을 매핑
+    //        if (newState == AnimState.idle)
+    //            strAnim = Animation_Test.IDLE;
+    //        else if (newState == AnimState.trace)
+    //            strAnim = Animation_Test.RUN;
+    //        else if (newState == AnimState.attack)
+    //            strAnim = Animation_Test.ATTACK;
+    //        else if (newState == AnimState.die)
+    //            strAnim = Animation_Test.DEATH;
+    //        else if (newState == AnimState.hit)
+    //            strAnim = Animation_Test.DAMAGE;
+
+    //        // 3. 부드럽게 넘길지(CrossFade), 즉시 바꿀지(Play) 결정
+    //        if (0.0f < CrossTime)
+    //            m_RefAnimation.CrossFade(strAnim, CrossTime);
+    //        else
+    //            m_RefAnimation.Play(strAnim);
+
+    //        // 4. 애니메이션 재생이 성공한 뒤에 상태 변수들 갱신
+    //        m_PreState = newState;
+    //        m_CurState = newState;
+    //    }
+    //}
+
     void ChangeAnim(AnimState newState, float CrossTime = 0.0f)
     {
-        // 1. 현재 상태와 요청된 상태가 같다면 중복 재생 방지를 위해 리턴
         if (m_PreState == newState)
             return;
-        Debug.Log($"newState : {newState}");
-        // 2. 레거시 Animation 컴포넌트와 상수 관리용 스크립트가 모두 있는지 검사
+
         if (m_RefAnimation != null)
         {
-            // 기본값은 IDLE로 설정 (상수이므로 '클래스명.상수명'으로 접근)
-            string strAnim = Animation_Test.IDLE;
-
-            // 각 상태(Enum)에 맞는 애니메이션 파일 이름을 매핑
+            string strAnim = anim.Idle.name;
             if (newState == AnimState.idle)
-                strAnim = Animation_Test.IDLE;
+                strAnim = anim.Idle.name;
             else if (newState == AnimState.trace)
-                strAnim = Animation_Test.RUN;
+                strAnim = anim.Move.name;
             else if (newState == AnimState.attack)
-                strAnim = Animation_Test.ATTACK;
+                strAnim = anim.Attack1.name;
             else if (newState == AnimState.die)
-                strAnim = Animation_Test.DEATH;
-            else if (newState == AnimState.hit)
-                strAnim = Animation_Test.DAMAGE;
+                strAnim = anim.Die.name;
 
-            // 3. 부드럽게 넘길지(CrossFade), 즉시 바꿀지(Play) 결정
             if (0.0f < CrossTime)
                 m_RefAnimation.CrossFade(strAnim, CrossTime);
             else
                 m_RefAnimation.Play(strAnim);
+        }//if (m_RefAnimation != null)
 
-            // 4. 애니메이션 재생이 성공한 뒤에 상태 변수들 갱신
-            m_PreState = newState;
-            m_CurState = newState;
-        }
+        if (m_RefAnimator != null)
+        {
+            m_RefAnimator.ResetTrigger(m_PreState.ToString());
+            //기존에 적용되어 있던 Trigger 변수 제거
+
+            if (0.0f < CrossTime)
+                m_RefAnimator.SetTrigger(newState.ToString());
+            else
+            {
+                string animName = anim.Idle.name;
+                m_RefAnimator.Play(animName, -1, 0);
+                //가운데 -1은 Layer Index, 뒤에 0은 처음부터 다시 시작 플레이 시키겠다는 의미
+            }
+        }//if(m_RefAnimator != null)
+
+        m_PreState = newState;
+        m_CurState = newState;
+
     }
-
 
     //현재 공격 중인지 확인하는 메서드
     public bool IsWait()
