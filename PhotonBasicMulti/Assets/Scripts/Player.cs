@@ -226,7 +226,7 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
         keepMovingAfterDodge = true;
     }
 
-    // [수정] 모든 이동 방식을 transform.Translate 또는 transform.position 변경으로 전환
+    // 움직일 때
     public void Move()
     {
         if (0.0f < m_MvDelay)
@@ -235,7 +235,7 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
             return;
         }
 
-        if (isAttack && !isJump && !isDodge)
+        if (isAttack && !isJump && !isDodge) // 캐릭터가 점프 또는 회피상태가 아닐 경우 공격적용
         {
             // 공격 중에는 수평 이동을 제한하고 Y축(중력/점프)만 반영
             transform.position += new Vector3(0f, yVelocity * Time.deltaTime, 0f);
@@ -244,19 +244,19 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
 
         Vector3 moveVector = Vector3.zero;
 
-        if (isDodge && keepMovingAfterDodge)
+        if (isDodge && keepMovingAfterDodge) // 캐릭터가 회피중일 경우, 키보드에서 손을 떼더라도 회피를 시작했던 그 방향으로 강제로 밀어붙임
         {
             moveVector = new Vector3(dodgeMoveDir.x * speed, 0f, dodgeMoveDir.z * speed);
             if (dodgeMoveDir != Vector3.zero)
                 transform.LookAt(transform.position + new Vector3(dodgeMoveDir.x, 0f, dodgeMoveDir.z));
         }
-        else if (isJump && keepMovingAfterJump)
+        else if (isJump && keepMovingAfterJump) // 점프 도중 키보드를 방향을 바꿔도 방향이 바뀌지 않고 포물선을 그리며 이동
         {
             moveVector = new Vector3(jumpMoveDir.x * baseSpeed, 0f, jumpMoveDir.z * baseSpeed);
             if (jumpMoveDir != Vector3.zero)
                 transform.LookAt(transform.position + new Vector3(jumpMoveDir.x, 0f, jumpMoveDir.z));
         }
-        else
+        else // Shift를 눌렀을 경우 일반 스피드의 30% 속도만큼 감. 아니면 100% 속도 유지
         {
             velocity = Input.GetKey(KeyCode.LeftShift) ? baseSpeed * 0.3f : baseSpeed;
             moveVector = new Vector3(rotation.x * velocity, 0f, rotation.z * velocity);
@@ -289,6 +289,12 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
     public bool IsAttack()
     {
         return m_CurState == AnimState.attack || m_CurState == AnimState.skill;
+    }
+
+    //현재 회피 중인지 확인하는 메서드
+    public bool IsDodge()
+    {
+        return m_CurState == AnimState.dodge;
     }
 
     public void AttackOrder()
