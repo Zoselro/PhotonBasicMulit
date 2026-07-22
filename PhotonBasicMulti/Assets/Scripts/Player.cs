@@ -95,8 +95,6 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
         {
             ApplyGravity(); // 수동 중력 적용
             Move();
-
-            //UpdateMouseLook(); // 마우스 시선 처리
             AttackOrder();
             CheckMovementInput(); // 이동 입력 체크
             CheckJumpInput(); // 점프 입력 체크
@@ -276,6 +274,7 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
         // 수평 이동(X, Z)에 Y축 속도(점프/중력)를 병합하여 좌표 이동
         moveVector.y = yVelocity;
         transform.position += moveVector * Time.deltaTime;
+        //agent.Move(moveVector * Time.deltaTime);
     }
 
     public void Event_AttHit()
@@ -455,8 +454,6 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
             NetHp = (float)stream.ReceiveNext();
 
             id.text = m_Id;
-
-            Debug.Log("aaaa");
 
             if (m_IsJump)
             {

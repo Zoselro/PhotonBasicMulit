@@ -27,7 +27,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     [Header("Options")]
     [SerializeField] float MaxHp = 100;
     [SerializeField] private float detectRange = 10f; // 감지 범위 (10m)
-
+    [SerializeField] private float m_AttackDist = 1.5f; // 공격/정지 거리
 
     //--- Hp 바 표시
     float CurHp;
@@ -51,6 +51,25 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     private void Start()
     {
         CurHp = MaxHp;
+
+        if (pv.IsMine)
+        {
+            // 소유자만 NavMeshAgent를 활성화하고 정지 거리를 설정
+            if (nav != null)
+            {
+                nav.enabled = true;
+                nav.stoppingDistance = m_AttackDist;
+            }
+        }
+        else
+        {
+            // 원격 클라이언트에서는 NavMeshAgent를 아예 끄기
+            // 이렇게 해야 원격 클라이언트의 플레이어를 억지로 밀어내거나 튕겨내지 않음
+            if (nav != null)
+            {
+                nav.enabled = false;
+            }
+        }
     }
 
     private void Update()
@@ -64,31 +83,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
                 targetCheckTimer = 0f;
                 TargetScanning();
             }
-
-            // 몬스터가 공격하거나, 데미지를 받았거나, 죽었을 경우 추적하지 않음.
-            if (IsWait())
-            {
-                nav.isStopped = true;
-                return;
-            }
-            // 타겟이 있고 추적 상태(`isChase`)일 때만 실제로 NavMeshAgent를 이동시킴
-            if (m_AggroTarget != null && nav.enabled && isChase)
-            {
-                nav.SetDestination(m_AggroTarget.position);
-                nav.isStopped = false; // 브레이크 해제, 전진!
-                ChangeAnim(AnimState.move, 0.12f);
-                //ChangeAnim(AnimState.move);
-            }
-            else
-            {
-                // 타겟이 없거나 범위 밖이면 제자리에 정지
-                if (nav.enabled)
-                {
-                    ChangeAnim(AnimState.idle, 0.12f);
-                    //ChangeAnim(AnimState.idle);
-                    nav.isStopped = true;
-                }
-            }
+            MonStateUpdate();
         }
         else // 다른 사람들의 화면(원격 아바타)일 경우
         {
@@ -110,12 +105,13 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
                 nav.updatePosition = false;
             }
             Remote_Take_Damage();
+            Remote_Animation();
         }
     }
 
     private void TargetScanning()
     {
-        // --- 1단계: 기존 타겟이 유효한지 먼저 검사 ---
+        // 기존 타겟이 유효한지 먼저 검사
         if (m_AggroTarget != null)
         {
             // 타겟이 파괴되었거나, 비활성화되었거나, 10m 범위를 벗어났다면 타겟 상실 처리
@@ -132,7 +128,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             }
         }
 
-        // --- 2단계: 기존 타겟이 없거나 유효하지 않을 때, 새 타겟 탐색 ---
+        // 기존 타겟이 없거나 유효하지 않을 때, 새 타겟 탐색
         // 주변 10m 범위 안의 모든 Collider를 수집
         Collider[] colliders = Physics.OverlapSphere(transform.position, detectRange);
 
@@ -165,6 +161,35 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         {
             // 범위 내에 플레이어가 단 한 명도 없다면 추적을 멈춤
             isChase = false;
+        }
+    }
+
+    private void MonStateUpdate()
+    {
+        // 몬스터가 공격하거나, 데미지를 받았거나, 죽었을 경우 추적하지 않음.
+        if (IsWait())
+        {
+            nav.isStopped = true;
+            return;
+        }
+        // 타겟이 있고 추적 상태(`isChase`)일 때만 실제로 NavMeshAgent를 이동시킴
+        if (m_AggroTarget != null && nav.enabled && isChase)
+        {
+            nav.SetDestination(m_AggroTarget.position);
+            nav.isStopped = false; // 브레이크 해제, 전진!
+
+            ChangeAnim(AnimState.move, 0.12f);
+            //ChangeAnim(AnimState.move);
+        }
+        else
+        {
+            // 타겟이 없거나 범위 밖이면 제자리에 정지
+            if (nav.enabled)
+            {
+                ChangeAnim(AnimState.idle, 0.12f);
+                //ChangeAnim(AnimState.idle);
+                nav.isStopped = true;
+            }
         }
     }
 
@@ -211,6 +236,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     {
         if (CurHp <= 0.0f)
             return;
+
         if (pv.IsMine) // 실제 데미지는 IsMine인 쪽에서만 계산해서 적용하도록 처리, 아니면, 
         {
             CurHp -= Damage;
@@ -224,10 +250,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
                 StartCoroutine(DamageAnim());
             }
             ImgHpbar.fillAmount = CurHp / MaxHp;
-        }
-        else
-        {
-            Debug.Log("다른곳");
         }
     }
 
@@ -261,7 +283,9 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             timer += Time.deltaTime;
             yield return null;
         }
-        PhotonNetwork.Destroy(gameObject);
+
+        if(pv.IsMine)
+            PhotonNetwork.Destroy(gameObject);
     }
 
     private void Remote_Take_Damage() // 원격지 컴퓨터에서 hp 동기화 함수
@@ -271,7 +295,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             CurHp = NetHp; // 원격 플레이어의 Monster의 hp를 수신 받은 hp로 업데이트
             ImgHpbar.fillAmount = CurHp / (float)MaxHp; // hp 바 업데이트
 
-            StartCoroutine(DamageAnim());
+            //StartCoroutine(DamageAnim());
             if (CurHp <= 0.0f)
             {
                 CurHp = 0.0f;
@@ -283,6 +307,11 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             CurHp = NetHp; // 원격 플레이어의 Monster의 hp를 수신 받은 hp로 업데이트
             ImgHpbar.fillAmount = CurHp / (float)MaxHp; // hp 바 업데이트
         }
+    }
+
+    private void Remote_Animation() // 원격지 컴퓨터에서 애니메이션 동기화 함수
+    {
+        ChangeAnim(m_CurState, 0.12f);
     }
 
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
