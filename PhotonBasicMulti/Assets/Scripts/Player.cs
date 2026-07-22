@@ -3,23 +3,6 @@ using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.UI;
 
-public enum AnimState
-{
-    idle,
-    move,
-    trace,
-    attack,
-    skill,
-    die,
-    move_L,
-    move_R,
-    move_B,
-    count,
-    jump,
-    dodge,
-    hit
-}
-
 public class Player : MonoBehaviourPunCallbacks, IPunObservable
 {
     [Header("Options")]
@@ -472,6 +455,8 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
             NetHp = (float)stream.ReceiveNext();
 
             id.text = m_Id;
+
+            Debug.Log("aaaa");
 
             if (m_IsJump)
             {

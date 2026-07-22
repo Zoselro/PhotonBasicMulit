@@ -11,18 +11,6 @@ public enum MonType
     Count
 }
 
-[System.Serializable]
-public class Anim
-{
-    public AnimationClip Idle;
-    public AnimationClip Move;
-    public AnimationClip Attack1;
-    public AnimationClip Attack2;
-    public AnimationClip Skill1;
-    public AnimationClip Skill2;
-    public AnimationClip Die;
-}
-
 public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 {
     [Header("Components")]
@@ -50,7 +38,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     //--- 애니메이션
     [SerializeField] private Animator m_RefAnimator = null;
     private Anim anim;
-    [SerializeField] private Animation m_RefAnimation = null;
 
     AnimState m_PreState = AnimState.idle; //애니메이션 변경을 위한 함수 
     AnimState m_CurState = AnimState.idle; //애니메이션 변경을 위한 변수
@@ -63,7 +50,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     bool isFirstUpdate = true;
     private void Start()
     {
-        m_RefAnimator = GetComponent<Animator>();
         CurHp = MaxHp;
     }
 
@@ -71,8 +57,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     {
         if (pv.IsMine) // 이 몬스터의 소유권을 가진 컴퓨터만 AI를 연산함
         {
-            if (CurHp <= 0.0f) return; // 사망 시 AI 중지
-
             // 0.2초마다 타겟팅 상태를 갱신 (매 프레임 OverlapSphere를 돌리면 렉 유발)
             targetCheckTimer += Time.deltaTime;
             if (targetCheckTimer >= targetCheckInterval)
@@ -81,19 +65,27 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
                 TargetScanning();
             }
 
+            // 몬스터가 공격하거나, 데미지를 받았거나, 죽었을 경우 추적하지 않음.
+            if (IsWait())
+            {
+                nav.isStopped = true;
+                return;
+            }
             // 타겟이 있고 추적 상태(`isChase`)일 때만 실제로 NavMeshAgent를 이동시킴
             if (m_AggroTarget != null && nav.enabled && isChase)
             {
                 nav.SetDestination(m_AggroTarget.position);
                 nav.isStopped = false; // 브레이크 해제, 전진!
-                ChangeAnim(AnimState.trace);
+                ChangeAnim(AnimState.move, 0.12f);
+                //ChangeAnim(AnimState.move);
             }
             else
             {
                 // 타겟이 없거나 범위 밖이면 제자리에 정지
                 if (nav.enabled)
                 {
-                    ChangeAnim(AnimState.idle);
+                    ChangeAnim(AnimState.idle, 0.12f);
+                    //ChangeAnim(AnimState.idle);
                     nav.isStopped = true;
                 }
             }
@@ -176,89 +168,44 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         }
     }
 
-    //void ChangeAnim(AnimState newState, float CrossTime = 0.0f)
-    //{
-    //    // 1. 현재 상태와 요청된 상태가 같다면 중복 재생 방지를 위해 리턴
-    //    if (m_PreState == newState)
-    //        return;
-    //    Debug.Log($"newState : {newState}");
-    //    // 2. 레거시 Animation 컴포넌트와 상수 관리용 스크립트가 모두 있는지 검사
-    //    if (m_RefAnimation != null)
-    //    {
-    //        // 기본값은 IDLE로 설정 (상수이므로 '클래스명.상수명'으로 접근)
-    //        string strAnim = Animation_Test.IDLE;
-
-    //        // 각 상태(Enum)에 맞는 애니메이션 파일 이름을 매핑
-    //        if (newState == AnimState.idle)
-    //            strAnim = Animation_Test.IDLE;
-    //        else if (newState == AnimState.trace)
-    //            strAnim = Animation_Test.RUN;
-    //        else if (newState == AnimState.attack)
-    //            strAnim = Animation_Test.ATTACK;
-    //        else if (newState == AnimState.die)
-    //            strAnim = Animation_Test.DEATH;
-    //        else if (newState == AnimState.hit)
-    //            strAnim = Animation_Test.DAMAGE;
-
-    //        // 3. 부드럽게 넘길지(CrossFade), 즉시 바꿀지(Play) 결정
-    //        if (0.0f < CrossTime)
-    //            m_RefAnimation.CrossFade(strAnim, CrossTime);
-    //        else
-    //            m_RefAnimation.Play(strAnim);
-
-    //        // 4. 애니메이션 재생이 성공한 뒤에 상태 변수들 갱신
-    //        m_PreState = newState;
-    //        m_CurState = newState;
-    //    }
-    //}
-
-    void ChangeAnim(AnimState newState, float CrossTime = 0.0f)
+    void ChangeAnim(AnimState newState, float CrossTime)
     {
         if (m_PreState == newState)
-            return;
-
-        if (m_RefAnimation != null)
         {
-            string strAnim = anim.Idle.name;
-            if (newState == AnimState.idle)
-                strAnim = anim.Idle.name;
-            else if (newState == AnimState.trace)
-                strAnim = anim.Move.name;
-            else if (newState == AnimState.attack)
-                strAnim = anim.Attack1.name;
-            else if (newState == AnimState.die)
-                strAnim = anim.Die.name;
-
-            if (0.0f < CrossTime)
-                m_RefAnimation.CrossFade(strAnim, CrossTime);
-            else
-                m_RefAnimation.Play(strAnim);
-        }//if (m_RefAnimation != null)
+            return;
+        }
 
         if (m_RefAnimator != null)
         {
             m_RefAnimator.ResetTrigger(m_PreState.ToString());
             //기존에 적용되어 있던 Trigger 변수 제거
 
+            //m_RefAnimator.SetTrigger(newState.ToString());
+
             if (0.0f < CrossTime)
+            {
                 m_RefAnimator.SetTrigger(newState.ToString());
+            }
             else
             {
                 string animName = anim.Idle.name;
-                m_RefAnimator.Play(animName, -1, 0);
+                Debug.Log($"animName : {animName}");
+                //m_RefAnimator.Play(animName, -1, 0);
+                m_RefAnimator.Play(newState.ToString(), -1, 0);
+                Debug.Log($"Animstate : {newState.ToString()}");
                 //가운데 -1은 Layer Index, 뒤에 0은 처음부터 다시 시작 플레이 시키겠다는 의미
             }
-        }//if(m_RefAnimator != null)
+        }
 
         m_PreState = newState;
         m_CurState = newState;
 
     }
 
-    //현재 공격 중인지 확인하는 메서드
+    //현재 공격이나 죽거나 데미지를 받았는지 확인하는 메서드 (잠깐 navMesh를 멈추기 위함)
     public bool IsWait()
     {
-        return m_CurState == AnimState.attack || m_CurState == AnimState.hit || m_CurState == AnimState.die;
+        return m_CurState == AnimState.attack || m_CurState == AnimState.damage || m_CurState == AnimState.die;
     }
     public void TakeDamage(GameObject Attacker, float Damage)
     {
@@ -267,31 +214,53 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         if (pv.IsMine) // 실제 데미지는 IsMine인 쪽에서만 계산해서 적용하도록 처리, 아니면, 
         {
             CurHp -= Damage;
-            if (CurHp < 0.0f)
-                CurHp = 0.0f;
-            ChangeAnim(AnimState.hit);
-            ImgHpbar.fillAmount = CurHp / MaxHp;
-            if(CurHp <= 0.0f)
+            if (CurHp <= 0.0f)
             {
-                CurHp = 0.0f;
                 StartCoroutine(Die());
+                CurHp = 0.0f;
             }
+            else
+            {
+                StartCoroutine(DamageAnim());
+            }
+            ImgHpbar.fillAmount = CurHp / MaxHp;
         }
+        else
+        {
+            Debug.Log("다른곳");
+        }
+    }
+
+    private IEnumerator DamageAnim()
+    {
+        ChangeAnim(AnimState.damage, 0.12f);
+        //ChangeAnim(AnimState.damage);
+        float timer = 0f;
+
+        while (timer < 1f)
+        {
+            timer += Time.deltaTime;
+            yield return null;
+        }
+
+        ChangeAnim(AnimState.idle, 0.12f);
+        //ChangeAnim(AnimState.idle);
     }
 
     private IEnumerator Die()
     {
-        Debug.Log("몬스터 사망");
         isChase = false;
         m_AggroTarget = null;
         ChangeAnim(AnimState.die, 0.1f);
-        if (nav != null)
-        {
-            nav.isStopped = true;
-            nav.enabled = false; // 컴포넌트 자체를 끄기
-        }
-        yield return new WaitForSeconds(2f);
+        float timer = 0f;
 
+        //ChangeAnim(AnimState.die);
+
+        while(timer < 2f)
+        {
+            timer += Time.deltaTime;
+            yield return null;
+        }
         PhotonNetwork.Destroy(gameObject);
     }
 
@@ -302,9 +271,11 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             CurHp = NetHp; // 원격 플레이어의 Monster의 hp를 수신 받은 hp로 업데이트
             ImgHpbar.fillAmount = CurHp / (float)MaxHp; // hp 바 업데이트
 
+            StartCoroutine(DamageAnim());
             if (CurHp <= 0.0f)
             {
                 CurHp = 0.0f;
+                StartCoroutine(Die());
             }
         }
         else
@@ -316,7 +287,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
     {
-        Debug.Log("몬스터 네트워크 오브젝트 동기화 처리");
         // 로컬 몬스터 위치 정보 송신
         if (stream.IsWriting)
         {
@@ -331,9 +301,9 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             CurPos = (Vector3)stream.ReceiveNext();
             CurRot = (Quaternion)stream.ReceiveNext();
             NetHp = (float)stream.ReceiveNext();
-            m_Id  = (string)stream.ReceiveNext();
+            m_Id = (string)stream.ReceiveNext();
             m_CurState = (AnimState)stream.ReceiveNext();
-
+            Debug.Log($"m_CurState : {m_CurState}");
             id.text = m_Id;
 
             if (isFirstUpdate)
