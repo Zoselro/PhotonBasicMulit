@@ -175,11 +175,26 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         // 타겟이 있고 추적 상태(`isChase`)일 때만 실제로 NavMeshAgent를 이동시킴
         if (m_AggroTarget != null && nav.enabled && isChase)
         {
-            nav.SetDestination(m_AggroTarget.position);
-            nav.isStopped = false; // 브레이크 해제, 전진!
+            //nav.SetDestination(m_AggroTarget.position);
+            //nav.isStopped = false; // 브레이크 해제, 전진!
 
-            ChangeAnim(AnimState.move, 0.12f);
-            //ChangeAnim(AnimState.move);
+            //ChangeAnim(AnimState.move, 0.12f);
+            ////ChangeAnim(AnimState.move);
+            float distanceToTarget = Vector3.Distance(transform.position, m_AggroTarget.position);
+
+            if (distanceToTarget <= m_AttackDist)
+            {
+                // ★ 2. 공격 시작! (이 함수 안에서 m_CurState가 attack으로 바뀝니다)
+                //StartCoroutine(AttackRoutine());
+                AttackRoutine();
+            }
+            else
+            {
+                // 사거리 밖이면 이동
+                nav.SetDestination(m_AggroTarget.position);
+                nav.isStopped = false;
+                ChangeAnim(AnimState.move, 0.12f);
+            }
         }
         else
         {
@@ -286,6 +301,21 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 
         if(pv.IsMine)
             PhotonNetwork.Destroy(gameObject);
+    }
+
+    private void AttackRoutine()
+    {
+        nav.isStopped = true;
+
+        // 여기서 m_CurState가 attack으로 바뀌면서 다음 프레임부터 IsWait()에 걸립니다.
+        ChangeAnim(AnimState.attack, 0.12f);
+
+        // 공격 모션 길이만큼 대기 (예: 1.2초)
+        //yield return new WaitForSeconds(1.2f);
+
+        // ★ 3. 모션이 끝나면 idle로 되돌려놓아 IsWait()을 풀어줍니다.
+        //m_CurState = AnimState.idle;
+        //sm_PreState = AnimState.idle;
     }
 
     private void Remote_Take_Damage() // 원격지 컴퓨터에서 hp 동기화 함수
