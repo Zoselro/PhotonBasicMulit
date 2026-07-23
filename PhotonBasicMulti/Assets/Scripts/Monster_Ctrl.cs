@@ -75,15 +75,16 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 
     private void Update()
     {
+        // 0.2초마다 타겟팅 상태를 갱신 (매 프레임 OverlapSphere를 돌리면 렉 유발)
+        targetCheckTimer += Time.deltaTime;
+        if (targetCheckTimer >= targetCheckInterval)
+        {
+            targetCheckTimer = 0f;
+            TargetScanning();
+        }
+
         if (pv.IsMine) // 이 몬스터의 소유권을 가진 컴퓨터만 AI를 연산함
         {
-            // 0.2초마다 타겟팅 상태를 갱신 (매 프레임 OverlapSphere를 돌리면 렉 유발)
-            targetCheckTimer += Time.deltaTime;
-            if (targetCheckTimer >= targetCheckInterval)
-            {
-                targetCheckTimer = 0f;
-                TargetScanning();
-            }
             MonStateUpdate();
         }
         else // 다른 사람들의 화면(원격 아바타)일 경우
@@ -308,7 +309,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     }
 
     // 공격 할 때 데미지가 들어가게 하는 이벤트 함수
-    public virtual void OnAttackHit()
+    private void OnAttackHit()
     {
         if (pv.IsMine)
         {
@@ -317,8 +318,10 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
                 Player player = m_AggroTarget.GetComponent<Player>();
                 float distanceToTarget = Vector3.Distance(transform.position, m_AggroTarget.position);
 
+                Debug.Log("player : " + player.gameObject.name);
                 if(distanceToTarget < m_DamageDist) // 몬스터와 플레이어간의 거리가 정해둔 거리 미만 일 때 데미지가 들어감
                 {
+                    Debug.Log("Damage 들어감!" + damage);
                     player.TakeDamage(damage);
                 }
             }

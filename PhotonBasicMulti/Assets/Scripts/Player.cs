@@ -79,6 +79,7 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
     private void Start()
     {
         CurHp = MaxHp;
+        NetHp = MaxHp;
         baseSpeed = speed;
         if (pv.IsMine)
         {
@@ -410,10 +411,10 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
 
     private void Remote_TakeDamage() // 원격지 컴퓨터에서 Hp 동기화 함수
     {
+
         if (0.0f < CurHp)
         {
-            CurHp = NetHp; // 원격 플레이어의 체력 값을 수신 받은 NetHp로 업데이트
-
+            CurHp = NetHp;// 원격 플레이어의 체력 값을 수신 받은 NetHp로 업데이트
             // Image UI항목의 fillAmount을 속성을 조절해 생명 게이지값 조정
             ImgHpbar.fillAmount = CurHp / (float)MaxHp;
 
