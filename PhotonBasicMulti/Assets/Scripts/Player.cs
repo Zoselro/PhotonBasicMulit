@@ -386,21 +386,16 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
         if (pv.IsMine)
         {
             CurHp -= Damage;
-            if (CurHp < 0.0f)
+            if (CurHp <= 0.0f)
+            {
                 CurHp = 0.0f;
+                Die();
+            }
             ImgHpbar.fillAmount = CurHp / MaxHp;
         }
 
         Vector3 cacPos = this.transform.position;
         cacPos.y += 2.65f;
-
-        if (pv.IsMine)
-        {
-            if (CurHp <= 0.0f)
-            {
-                Die();   //사망처리
-            }
-        }
     }
 
 

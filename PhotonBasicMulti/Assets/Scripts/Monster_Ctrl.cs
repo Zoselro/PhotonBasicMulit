@@ -6,9 +6,8 @@ using UnityEngine.UI;
 
 public enum MonType
 {
-    Skeleton = 0,
-    Alien,
-    Count
+    monster = 0,
+    bossMonster
 }
 
 public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
@@ -21,13 +20,16 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 
     [Header("MonsterAI")]
     [SerializeField] private Transform m_AggroTarget = null; // 공격 대상
+    [SerializeField] private float targetCheckInterval = 0.2f; // 0.2초마다 타겟 체크 연산 실행
     private float targetCheckTimer = 0f;
-    private float targetCheckInterval = 0.2f; // 0.2초마다 타겟 체크 연산 실행
+    [SerializeField] private MonType monType;
 
     [Header("Options")]
-    [SerializeField] float MaxHp = 100;
+    [SerializeField] float MaxHp = 100; // 몬스터 최대 체력
     [SerializeField] private float detectRange = 10f; // 감지 범위 (10m)
     [SerializeField] private float m_AttackDist = 1.5f; // 공격/정지 거리
+    [SerializeField] private float m_DamageDist = 1.5f; // 공격모션을 할 때 몬스터와 플레이어간의 거리
+    [SerializeField] private float damage = 100f; // 공격 시 데미지 
 
     //--- Hp 바 표시
     float CurHp;
@@ -37,7 +39,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 
     //--- 애니메이션
     [SerializeField] private Animator m_RefAnimator = null;
-    private Anim anim;
 
     AnimState m_PreState = AnimState.idle; //애니메이션 변경을 위한 함수 
     AnimState m_CurState = AnimState.idle; //애니메이션 변경을 위한 변수
@@ -170,23 +171,20 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         if (IsWait())
         {
             nav.isStopped = true;
+            nav.velocity = Vector3.zero; // 이전 속도 잔여값 제거
             return;
         }
         // 타겟이 있고 추적 상태(`isChase`)일 때만 실제로 NavMeshAgent를 이동시킴
         if (m_AggroTarget != null && nav.enabled && isChase)
         {
-            //nav.SetDestination(m_AggroTarget.position);
-            //nav.isStopped = false; // 브레이크 해제, 전진!
-
-            //ChangeAnim(AnimState.move, 0.12f);
-            ////ChangeAnim(AnimState.move);
             float distanceToTarget = Vector3.Distance(transform.position, m_AggroTarget.position);
 
             if (distanceToTarget <= m_AttackDist)
             {
                 // ★ 2. 공격 시작! (이 함수 안에서 m_CurState가 attack으로 바뀝니다)
                 //StartCoroutine(AttackRoutine());
-                AttackRoutine();
+                transform.LookAt(m_AggroTarget);
+                Attack();
             }
             else
             {
@@ -204,6 +202,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
                 ChangeAnim(AnimState.idle, 0.12f);
                 //ChangeAnim(AnimState.idle);
                 nav.isStopped = true;
+                nav.velocity = Vector3.zero; // 이전 속도 잔여값 제거
             }
         }
     }
@@ -228,12 +227,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             }
             else
             {
-                string animName = anim.Idle.name;
-                Debug.Log($"animName : {animName}");
-                //m_RefAnimator.Play(animName, -1, 0);
-                m_RefAnimator.Play(newState.ToString(), -1, 0);
-                Debug.Log($"Animstate : {newState.ToString()}");
-                //가운데 -1은 Layer Index, 뒤에 0은 처음부터 다시 시작 플레이 시키겠다는 의미
+                m_RefAnimator.Play(newState.ToString(), 0, 0f);
             }
         }
 
@@ -268,10 +262,10 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         }
     }
 
+    // 몬스터가 데미지를 받았을 때 일어나는 애니메이션
     private IEnumerator DamageAnim()
     {
-        ChangeAnim(AnimState.damage, 0.12f);
-        //ChangeAnim(AnimState.damage);
+        ChangeAnim(AnimState.damage, 0f);
         float timer = 0f;
 
         while (timer < 1f)
@@ -281,7 +275,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         }
 
         ChangeAnim(AnimState.idle, 0.12f);
-        //ChangeAnim(AnimState.idle);
     }
 
     private IEnumerator Die()
@@ -303,19 +296,64 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             PhotonNetwork.Destroy(gameObject);
     }
 
-    private void AttackRoutine()
+    #region 이벤트 메서드
+    // 애니메이션이 완전히 끝났을 때 호출할 이벤트 함수
+    private void OnAnimationEnd()
+    {
+        if (pv.IsMine)
+        {
+            m_CurState = AnimState.idle;
+            m_PreState = AnimState.idle; // Trigger 중복 방지 리셋
+        }
+    }
+
+    // 공격 할 때 데미지가 들어가게 하는 이벤트 함수
+    public virtual void OnAttackHit()
+    {
+        if (pv.IsMine)
+        {
+            if (m_AggroTarget != null)
+            {
+                Player player = m_AggroTarget.GetComponent<Player>();
+                float distanceToTarget = Vector3.Distance(transform.position, m_AggroTarget.position);
+
+                if(distanceToTarget < m_DamageDist) // 몬스터와 플레이어간의 거리가 정해둔 거리 미만 일 때 데미지가 들어감
+                {
+                    player.TakeDamage(damage);
+                }
+            }
+            else
+            {
+                Debug.Log("어그로 된 플레이어 존재하지 않음.");
+
+                // 1. 트리거 리셋 및 강제 Idle 상태로 애니메이션 재시작
+                if (m_RefAnimator != null)
+                {
+                    m_RefAnimator.ResetTrigger(m_PreState.ToString());
+                    //m_RefAnimator.SetTrigger(AnimState.idle.ToString());
+                    m_RefAnimator.Play(AnimState.idle.ToString(), 0, 0f);
+                }
+
+                // 2. 상태 변수 강제 초기화
+                m_CurState = AnimState.idle;
+                m_PreState = AnimState.idle;
+
+                // 3. NavMeshAgent 재개
+                if (nav != null && nav.enabled)
+                {
+                    nav.isStopped = false;
+                }
+            }
+        }
+    }
+    #endregion
+
+    private void Attack()
     {
         nav.isStopped = true;
+        nav.velocity = Vector3.zero; // 이전 속도 잔여값 제거
 
-        // 여기서 m_CurState가 attack으로 바뀌면서 다음 프레임부터 IsWait()에 걸립니다.
         ChangeAnim(AnimState.attack, 0.12f);
-
-        // 공격 모션 길이만큼 대기 (예: 1.2초)
-        //yield return new WaitForSeconds(1.2f);
-
-        // ★ 3. 모션이 끝나면 idle로 되돌려놓아 IsWait()을 풀어줍니다.
-        //m_CurState = AnimState.idle;
-        //sm_PreState = AnimState.idle;
     }
 
     private void Remote_Take_Damage() // 원격지 컴퓨터에서 hp 동기화 함수
@@ -362,7 +400,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             NetHp = (float)stream.ReceiveNext();
             m_Id = (string)stream.ReceiveNext();
             m_CurState = (AnimState)stream.ReceiveNext();
-            Debug.Log($"m_CurState : {m_CurState}");
             id.text = m_Id;
 
             if (isFirstUpdate)
