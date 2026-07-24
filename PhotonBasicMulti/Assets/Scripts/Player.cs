@@ -384,16 +384,14 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
     {
         if (CurHp <= 0.0f)
             return;
-        if (pv.IsMine)
+
+        CurHp -= Damage;
+        if (CurHp <= 0.0f)
         {
-            CurHp -= Damage;
-            if (CurHp <= 0.0f)
-            {
-                CurHp = 0.0f;
-                Die();
-            }
-            ImgHpbar.fillAmount = CurHp / MaxHp;
+            CurHp = 0.0f;
+            Die();
         }
+        ImgHpbar.fillAmount = CurHp / MaxHp;
 
         Vector3 cacPos = this.transform.position;
         cacPos.y += 2.65f;
@@ -411,18 +409,17 @@ public class Player : MonoBehaviourPunCallbacks, IPunObservable
 
     private void Remote_TakeDamage() // 원격지 컴퓨터에서 Hp 동기화 함수
     {
-
-        if (0.0f < CurHp)
+        if (CurHp >= 0)
         {
             CurHp = NetHp;// 원격 플레이어의 체력 값을 수신 받은 NetHp로 업데이트
             // Image UI항목의 fillAmount을 속성을 조절해 생명 게이지값 조정
             ImgHpbar.fillAmount = CurHp / (float)MaxHp;
 
-            if (CurHp <= 0.0f) // 사망 처리는 한 번 만 호출되기 하기 위함.
-            {
-                CurHp = 0.0f;
-                //Die();   //사망처리
-            }
+        }
+        else if (CurHp <= 0.0f) // 사망 처리는 한 번 만 호출되기 하기 위함.
+        {
+            CurHp = 0.0f;
+            //Die();   //사망처리
         }
     }
 

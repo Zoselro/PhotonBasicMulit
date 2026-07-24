@@ -181,7 +181,6 @@ public class GameManager : MonoBehaviourPunCallbacks
 
             //Resources¿¡ »©³ù´ø "HeroPrefab" ÇÁ¸®ÆÕ
             PhotonNetwork.Instantiate("HeroPrefab", hPos, Quaternion.identity, 0);
-            PhotonNetwork.Instantiate("StoneMonster", hPos, Quaternion.identity, 0);
         }
     }
 

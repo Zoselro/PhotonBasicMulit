@@ -75,7 +75,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 
     private void Update()
     {
-        // 0.2초마다 타겟팅 상태를 갱신 (매 프레임 OverlapSphere를 돌리면 렉 유발)
         targetCheckTimer += Time.deltaTime;
         if (targetCheckTimer >= targetCheckInterval)
         {
@@ -83,11 +82,14 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             TargetScanning();
         }
 
-        if (pv.IsMine) // 이 몬스터의 소유권을 가진 컴퓨터만 AI를 연산함
+        if (pv.IsMine)
         {
             MonStateUpdate();
         }
-        else // 다른 사람들의 화면(원격 아바타)일 경우
+
+        // 0.2초마다 타겟팅 상태를 갱신 (매 프레임 OverlapSphere를 돌리면 렉 유발)
+
+        if(!pv.IsMine) // 다른 사람들의 화면(원격 아바타)일 경우
         {
             // 플레이어 코드에서 했던 것처럼, 포톤으로 받아온 위치와 회전값을 동기화해 줍니다.
             if (10.0f < (transform.position - CurPos).magnitude)
@@ -122,11 +124,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             {
                 m_AggroTarget = null;
                 isChase = false; // 범위 밖으로 나가면 추적 중지
-            }
-            else
-            {
-                // 아직 타겟이 유효하고 범위 내에 있다면 다른 타겟을 찾지 않고 그대로 유지
-                return;
             }
         }
 
@@ -311,41 +308,37 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     // 공격 할 때 데미지가 들어가게 하는 이벤트 함수
     private void OnAttackHit()
     {
-        if (pv.IsMine)
+        if (m_AggroTarget != null)
         {
-            if (m_AggroTarget != null)
-            {
-                Player player = m_AggroTarget.GetComponent<Player>();
-                float distanceToTarget = Vector3.Distance(transform.position, m_AggroTarget.position);
+            Player player = m_AggroTarget.GetComponent<Player>();
+            float distanceToTarget = Vector3.Distance(transform.position, m_AggroTarget.position);
 
-                Debug.Log("player : " + player.gameObject.name);
-                if(distanceToTarget < m_DamageDist) // 몬스터와 플레이어간의 거리가 정해둔 거리 미만 일 때 데미지가 들어감
-                {
-                    Debug.Log("Damage 들어감!" + damage);
-                    player.TakeDamage(damage);
-                }
+            Debug.Log("player : " + player.gameObject.name);
+            if(distanceToTarget < m_DamageDist) // 몬스터와 플레이어간의 거리가 정해둔 거리 미만 일 때 데미지가 들어감
+            {
+                player.TakeDamage(damage);
             }
-            else
+        }
+        else
+        {
+            Debug.Log("어그로 된 플레이어 존재하지 않음.");
+
+            // 1. 트리거 리셋 및 강제 Idle 상태로 애니메이션 재시작
+            if (m_RefAnimator != null)
             {
-                Debug.Log("어그로 된 플레이어 존재하지 않음.");
+                m_RefAnimator.ResetTrigger(m_PreState.ToString());
+                //m_RefAnimator.SetTrigger(AnimState.idle.ToString());
+                m_RefAnimator.Play(AnimState.idle.ToString(), 0, 0f);
+            }
 
-                // 1. 트리거 리셋 및 강제 Idle 상태로 애니메이션 재시작
-                if (m_RefAnimator != null)
-                {
-                    m_RefAnimator.ResetTrigger(m_PreState.ToString());
-                    //m_RefAnimator.SetTrigger(AnimState.idle.ToString());
-                    m_RefAnimator.Play(AnimState.idle.ToString(), 0, 0f);
-                }
+            // 2. 상태 변수 강제 초기화
+            m_CurState = AnimState.idle;
+            m_PreState = AnimState.idle;
 
-                // 2. 상태 변수 강제 초기화
-                m_CurState = AnimState.idle;
-                m_PreState = AnimState.idle;
-
-                // 3. NavMeshAgent 재개
-                if (nav != null && nav.enabled)
-                {
-                    nav.isStopped = false;
-                }
+            // 3. NavMeshAgent 재개
+            if (nav != null && nav.enabled)
+            {
+                nav.isStopped = false;
             }
         }
     }
