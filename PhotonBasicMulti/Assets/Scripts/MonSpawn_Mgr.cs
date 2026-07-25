@@ -1,6 +1,5 @@
 using Photon.Pun;
 using HashTable = ExitGames.Client.Photon.Hashtable; // 포톤의 해시테이블을 사용하기 위한 별칭
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Photon.Realtime;
@@ -138,7 +137,10 @@ public class MonSpawn_Mgr : MonoBehaviourPunCallbacks
             // double spawnTime = IDLE_STATE or spawnTime == STATE_ACTIVE
             // 몬스터가 살아있다는 뜻이니 아무것도 하지말고 패스! (가장 빠른 탈출)
             if (spawnTime < 0.0f)
+            {
+                Debug.Log("몬스터가 살아있음!");
                 continue;
+            }
 
             // 시간이 되었으면 스폰
             if (spawnTime <= currentTime)
@@ -146,8 +148,12 @@ public class MonSpawn_Mgr : MonoBehaviourPunCallbacks
                 bool isActMon = false;
                 foreach (var mon in monList)
                 {
-                    isActMon = true;
-                    break;
+                    if(i == mon.SpawnIdx)
+                    {
+                        Debug.Log("mon.SpawnIdx : " + mon.SpawnIdx);
+                        isActMon = true;
+                        break;
+                    }
                 }
 
                 if (!isActMon)
@@ -179,6 +185,7 @@ public class MonSpawn_Mgr : MonoBehaviourPunCallbacks
         // InstantiateRoomObject의 마지막 인자로 data를 넘김.
         // 방 기준으로 A, B, C Pc에서도 스폰이 될 때 동기화 처리가 된다.
         GameObject TempMon = PhotonNetwork.InstantiateRoomObject(monsterName, sp.transform.position, sp.transform.rotation, 0, data);
+        Debug.Log($"Spawn {sitIdx}");
     }
 
     // 특정 위치의 스폰을 예약하는 함수
@@ -203,7 +210,7 @@ public class MonSpawn_Mgr : MonoBehaviourPunCallbacks
     }
 
     // 마스터 클라이언트 변경시 호출되는 함수
-    public override void OnMasterClientSwitched(Photon.Realtime.Player newMasterClient)
+    public override void OnMasterClientSwitched(Player newMasterClient)
     {
         base.OnMasterClientSwitched(newMasterClient);
 

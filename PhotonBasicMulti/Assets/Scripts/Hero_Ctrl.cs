@@ -81,10 +81,7 @@ public class Hero_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         CurHp = MaxHp;
         NetHp = MaxHp;
         baseSpeed = speed;
-        if (pv.IsMine)
-        {
-            GameManager.Inst.SetPlayer(this);
-        }
+
         m_Animator = this.GetComponent<Animator>();
     }
 

@@ -11,7 +11,7 @@ public enum MonType
     bossMonster
 }
 
-public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
+public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInstantiateMagicCallback
 {
     [Header("Components")]
     [SerializeField] PhotonView pv = null; // Photon View 컴포넌트 할당 변수
@@ -47,6 +47,9 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 
     private Vector3 CurPos = Vector3.zero;
     private Quaternion CurRot = Quaternion.identity;
+    private int m_SpawnIdx = -1; // List<SpawnPos> m_SpawnPos; 인덱스
+    public int SpawnIdx => m_SpawnIdx;
+
 
     private bool isChase = false;
     bool isFirstUpdate = true;
@@ -295,7 +298,9 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             yield return null;
         }
 
-        if(pv.IsMine)
+        MonSpawn_Mgr.Inst.ScheduleAllSpawns(m_SpawnIdx, Random.Range(10.0f, 15.0f));
+
+        if (pv.IsMine)
             PhotonNetwork.Destroy(gameObject);
     }
 
@@ -412,6 +417,22 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
                 // 다음부터는 부드럽게 움직이도록 플래그 끔
                 isFirstUpdate = false;
             }
+        }
+    }
+
+    // PhotonNetwork.Instantiate() 또는 PhotonNetwork.InstantiateRoomObject()
+    // 로 생성된 네트워크 오브젝트가 생성될 때 자동으로 호출되는 함수
+    // 방 기준으로 Awake() 함수 직후 자동으로 호출되는 함수
+    public void OnPhotonInstantiate(PhotonMessageInfo info)
+    {
+        // 넘어온 데이터가 있는지 확인
+        Debug.Log("몬스터 네트워크 오브젝트 생성됨");
+        object[] data = info.photonView.InstantiationData;
+        if (data != null && data.Length > 0)
+        {
+            // "아, 나는 3번 스폰 위치 번호 출신이구나!" 하고 이 세계 공통으로 각인됨
+            m_SpawnIdx = (int)data[0];
+            Debug.Log($"m_SpawnIdx : {m_SpawnIdx}");
         }
     }
 
