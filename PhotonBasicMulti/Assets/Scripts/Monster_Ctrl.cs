@@ -3,6 +3,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.UI;
+using Photon.Realtime;
 
 public enum MonType
 {
@@ -75,6 +76,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 
     private void Update()
     {
+        // 0.2초마다 타겟팅 상태를 갱신 (매 프레임 OverlapSphere를 돌리면 렉 유발)
         targetCheckTimer += Time.deltaTime;
         if (targetCheckTimer >= targetCheckInterval)
         {
@@ -86,8 +88,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         {
             MonStateUpdate();
         }
-
-        // 0.2초마다 타겟팅 상태를 갱신 (매 프레임 OverlapSphere를 돌리면 렉 유발)
 
         if(!pv.IsMine) // 다른 사람들의 화면(원격 아바타)일 경우
         {
@@ -115,18 +115,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 
     private void TargetScanning()
     {
-        // 기존 타겟이 유효한지 먼저 검사
-        if (m_AggroTarget != null)
-        {
-            // 타겟이 파괴되었거나, 비활성화되었거나, 10m 범위를 벗어났다면 타겟 상실 처리
-            float distance = Vector3.Distance(transform.position, m_AggroTarget.position);
-            if (!m_AggroTarget.gameObject.activeInHierarchy || distance > detectRange)
-            {
-                m_AggroTarget = null;
-                isChase = false; // 범위 밖으로 나가면 추적 중지
-            }
-        }
-
         // 기존 타겟이 없거나 유효하지 않을 때, 새 타겟 탐색
         // 주변 10m 범위 안의 모든 Collider를 수집
         Collider[] colliders = Physics.OverlapSphere(transform.position, detectRange);
@@ -137,7 +125,9 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         foreach (Collider col in colliders)
         {
             // Player 컴포넌트가 있는지 확인
-            Player player = col.GetComponent<Player>();
+            Hero_Ctrl player = col.GetComponent<Hero_Ctrl>();
+
+
             if (player != null)
             {
                 float dist = Vector3.Distance(transform.position, col.transform.position);
@@ -155,12 +145,27 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
         {
             m_AggroTarget = closestPlayer;
             isChase = true; // 추적 시작
+            Debug.Log("가장 가까운 플레이어를 타겟으로 확정");
         }
         else
         {
             // 범위 내에 플레이어가 단 한 명도 없다면 추적을 멈춤
+            Debug.Log("범위 내에 플레이어가 단 한 명도 없다면 추적을 멈춤");
             isChase = false;
         }
+        // 기존 타겟이 유효한지 먼저 검사
+        if (m_AggroTarget != null)
+        {   
+            // 타겟이 파괴되었거나, 비활성화되었거나, 10m 범위를 벗어났다면 타겟 상실 처리
+            float distance = Vector3.Distance(transform.position, m_AggroTarget.position);
+            if (!m_AggroTarget.gameObject.activeInHierarchy || distance > detectRange)
+            {
+                m_AggroTarget = null;
+                isChase = false; // 범위 밖으로 나가면 추적 중지
+                Debug.Log("범위 밖으로 나가면 추적 중지");
+            }
+        }
+
     }
 
     private void MonStateUpdate()
@@ -310,7 +315,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     {
         if (m_AggroTarget != null)
         {
-            Player player = m_AggroTarget.GetComponent<Player>();
+            Hero_Ctrl player = m_AggroTarget.GetComponent<Hero_Ctrl>();
             float distanceToTarget = Vector3.Distance(transform.position, m_AggroTarget.position);
 
             Debug.Log("player : " + player.gameObject.name);
@@ -363,7 +368,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             if (CurHp <= 0.0f)
             {
                 CurHp = 0.0f;
-                StartCoroutine(Die());
+                //StartCoroutine(Die());
             }
         }
         else
@@ -406,6 +411,32 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 
                 // 다음부터는 부드럽게 움직이도록 플래그 끔
                 isFirstUpdate = false;
+            }
+        }
+    }
+
+    public override void OnMasterClientSwitched(Player newMasterClient)
+    {
+        Debug.Log($"새 Master : {newMasterClient.NickName}");
+
+        if (pv.IsMine)
+        {
+            Debug.Log("내가 새로운 소유자가 되었습니다. NavMeshAgent를 활성화합니다.");
+
+            // 소유자만 NavMeshAgent를 활성화하고 정지 거리를 설정
+            if (nav != null)
+            {
+                nav.enabled = true;
+                nav.stoppingDistance = m_AttackDist;
+            }
+        }
+        else
+        {
+            // 원격 클라이언트에서는 NavMeshAgent를 아예 끄기
+            // 이렇게 해야 원격 클라이언트의 플레이어를 억지로 밀어내거나 튕겨내지 않음
+            if (nav != null)
+            {
+                nav.enabled = false;
             }
         }
     }

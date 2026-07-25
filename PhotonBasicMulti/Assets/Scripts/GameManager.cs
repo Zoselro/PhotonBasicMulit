@@ -18,7 +18,7 @@ public class GameManager : MonoBehaviourPunCallbacks
 
     private List<string> m_MsgList = new List<string>();
     private bool bEnter = false;
-    private Player player;
+    private Hero_Ctrl player;
 
     private bool is_Conversating; // 채팅 중인지 여부를 나타내는 변수
     public bool Is_Conversating => is_Conversating;
@@ -184,7 +184,7 @@ public class GameManager : MonoBehaviourPunCallbacks
         }
     }
 
-    public void SetPlayer(Player player)
+    public void SetPlayer(Hero_Ctrl player)
     {
         player = this.player;
     }

@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.UI;
 
-public class Player : MonoBehaviourPunCallbacks, IPunObservable
+public class Hero_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 {
     [Header("Options")]
     [SerializeField] private float speed;
