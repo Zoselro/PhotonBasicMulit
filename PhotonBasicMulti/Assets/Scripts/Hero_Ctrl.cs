@@ -79,7 +79,6 @@ public class Hero_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     private void Start()
     {
         CurHp = MaxHp;
-        NetHp = MaxHp;
         baseSpeed = speed;
 
         m_Animator = this.GetComponent<Animator>();
