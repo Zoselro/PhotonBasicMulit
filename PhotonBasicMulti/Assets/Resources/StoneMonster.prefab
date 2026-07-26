@@ -774,7 +774,7 @@ NavMeshAgent:
   m_Enabled: 1
   m_AgentTypeID: 0
   m_Radius: 0.5
-  m_Speed: 3.5
+  m_Speed: 6
   m_Acceleration: 8
   avoidancePriority: 50
   m_AngularSpeed: 120
@@ -824,9 +824,13 @@ MonoBehaviour:
   nav: {fileID: 7362590773173133715}
   id: {fileID: 7752051057231752285}
   m_AggroTarget: {fileID: 0}
+  targetCheckInterval: 0.2
+  monType: 0
   MaxHp: 100
-  detectRange: 10
+  detectRange: 20
   m_AttackDist: 1.5
+  m_DamageDist: 1.5
+  damage: 100
   m_RefAnimator: {fileID: 8623038367718990833}
 --- !u!114 &3911852088648290237
 MonoBehaviour:

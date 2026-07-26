@@ -132,16 +132,27 @@ namespace UnityStandardAssets.ImageEffects
                 Graphics.Blit (temp1, temp2, dofHdrMaterial, 2);
                 RenderTexture.ReleaseTemporary(temp1);
 
-                // "merge up" with background COC
-                dofHdrMaterial.SetTexture("_FgOverlap", temp2);
-                //fromTo.MarkRestoreExpected(); // only touching alpha channel, RT restore expected
-                Graphics.Blit (fromTo, fromTo, dofHdrMaterial,  13);
+                RenderTexture tempBuffer = RenderTexture.GetTemporary(fromTo.width, fromTo.height, 0, fromTo.format);
+                Graphics.Blit(fromTo, tempBuffer, dofHdrMaterial, 13);
+                Graphics.Blit(tempBuffer, fromTo);
+                RenderTexture.ReleaseTemporary(tempBuffer);
+
                 RenderTexture.ReleaseTemporary(temp2);
+
+                //// "merge up" with background COC
+                //dofHdrMaterial.SetTexture("_FgOverlap", temp2);
+                ////fromTo.MarkRestoreExpected(); // only touching alpha channel, RT restore expected
+                //Graphics.Blit (fromTo, fromTo, dofHdrMaterial,  13);
+                //RenderTexture.ReleaseTemporary(temp2);
             }
             else {
-                // capture full coc in alpha channel (fromTo is not read, but bound to detect screen flip)
-				//fromTo.MarkRestoreExpected(); // only touching alpha channel, RT restore expected
-                Graphics.Blit (fromTo, fromTo, dofHdrMaterial,  0);
+                //            // capture full coc in alpha channel (fromTo is not read, but bound to detect screen flip)
+                ////fromTo.MarkRestoreExpected(); // only touching alpha channel, RT restore expected
+                //            Graphics.Blit (fromTo, fromTo, dofHdrMaterial,  0);
+                RenderTexture tempBuffer = RenderTexture.GetTemporary(fromTo.width, fromTo.height, 0, fromTo.format);
+                Graphics.Blit(fromTo, tempBuffer, dofHdrMaterial, 0);
+                Graphics.Blit(tempBuffer, fromTo);
+                RenderTexture.ReleaseTemporary(tempBuffer);
             }
         }
 
