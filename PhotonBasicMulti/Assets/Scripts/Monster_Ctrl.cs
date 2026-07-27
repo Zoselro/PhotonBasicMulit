@@ -33,8 +33,8 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
     [SerializeField] private float damage = 100f; // 공격 시 데미지 
 
     //--- Hp 바 표시
-    float CurHp;
-    float NetHp;
+    [SerializeField] float CurHp;
+    [SerializeField] float NetHp;
     string m_Id = "";
     //--- Hp 바 표시
 
@@ -300,8 +300,13 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
 
         MonSpawn_Mgr.Inst.ScheduleAllSpawns(m_SpawnIdx, Random.Range(10.0f, 15.0f));
 
+        Debug.Log("몬스터 사망! IsMine 도달 안함");
+
         if (pv.IsMine)
+        {
+            Debug.Log("몬스터 죽음! IsMine 도달!");
             PhotonNetwork.Destroy(gameObject);
+        }
     }
 
     #region 이벤트 메서드
@@ -449,6 +454,13 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
             {
                 nav.enabled = true;
                 nav.stoppingDistance = m_AttackDist;
+                ChangeAnim(AnimState.idle, 0.12f); // 만약에, 몬스터가 모션 도중, 이전 소유자가 나갔을 경우 idle 상태로 전환
+                if (CurHp <= 0.0f) // 만약, 몬스터가 죽음과 동시에 이전 소유자가 나갔을 경우, Die를 이어나감
+                {
+                    Debug.Log("만약, 몬스터가 죽음과 동시에 이전 소유자가 나갔을 경우, 들어오는 코루틴 함수");
+                    StartCoroutine(Die());
+                    CurHp = 0.0f;
+                }
             }
         }
         else
