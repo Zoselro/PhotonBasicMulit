@@ -50,7 +50,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
     private int m_SpawnIdx = -1; // List<SpawnPos> m_SpawnPos; 인덱스
     public int SpawnIdx => m_SpawnIdx;
 
-
     private bool isChase = false;
     bool isFirstUpdate = true;
     private void Start()
@@ -188,7 +187,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
             if (distanceToTarget <= m_AttackDist)
             {
                 // ★ 2. 공격 시작! (이 함수 안에서 m_CurState가 attack으로 바뀝니다)
-                //StartCoroutine(AttackRoutine());
                 transform.LookAt(m_AggroTarget);
                 Attack();
             }
@@ -206,7 +204,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
             if (nav.enabled)
             {
                 ChangeAnim(AnimState.idle, 0.12f);
-                //ChangeAnim(AnimState.idle);
                 nav.isStopped = true;
                 nav.velocity = Vector3.zero; // 이전 속도 잔여값 제거
             }
@@ -255,16 +252,18 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
         if (pv.IsMine) // 실제 데미지는 IsMine인 쪽에서만 계산해서 적용하도록 처리, 아니면, 
         {
             CurHp -= Damage;
-            if (CurHp <= 0.0f)
-            {
-                StartCoroutine(Die());
-                CurHp = 0.0f;
-            }
-            else
-            {
-                StartCoroutine(DamageAnim());
-            }
+
+            StartCoroutine(DamageAnim());
+
             ImgHpbar.fillAmount = CurHp / MaxHp;
+        }
+        if (CurHp <= 0.0f)
+        {
+            isChase = false;
+            m_AggroTarget = null;
+            ChangeAnim(AnimState.die, 0.1f);
+
+            CurHp = 0.0f;
         }
     }
 
@@ -281,32 +280,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
         }
 
         ChangeAnim(AnimState.idle, 0.12f);
-    }
-
-    private IEnumerator Die()
-    {
-        isChase = false;
-        m_AggroTarget = null;
-        ChangeAnim(AnimState.die, 0.1f);
-        float timer = 0f;
-
-        //ChangeAnim(AnimState.die);
-
-        while(timer < 2f)
-        {
-            timer += Time.deltaTime;
-            yield return null;
-        }
-
-        MonSpawn_Mgr.Inst.ScheduleAllSpawns(m_SpawnIdx, Random.Range(10.0f, 15.0f));
-
-        Debug.Log("몬스터 사망! IsMine 도달 안함");
-
-        if (pv.IsMine)
-        {
-            Debug.Log("몬스터 죽음! IsMine 도달!");
-            PhotonNetwork.Destroy(gameObject);
-        }
     }
 
     #region 이벤트 메서드
@@ -357,6 +330,15 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
             }
         }
     }
+
+    private void Die()
+    {
+        if (!pv.IsMine)
+            return;
+
+        MonSpawn_Mgr.Inst.ScheduleAllSpawns(m_SpawnIdx, Random.Range(10.0f, 15.0f));
+        PhotonNetwork.Destroy(gameObject);
+    }
     #endregion
 
     private void Attack()
@@ -374,11 +356,9 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
             CurHp = NetHp; // 원격 플레이어의 Monster의 hp를 수신 받은 hp로 업데이트
             ImgHpbar.fillAmount = CurHp / (float)MaxHp; // hp 바 업데이트
 
-            //StartCoroutine(DamageAnim());
             if (CurHp <= 0.0f)
             {
                 CurHp = 0.0f;
-                //StartCoroutine(Die());
             }
         }
         else
@@ -454,13 +434,17 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
             {
                 nav.enabled = true;
                 nav.stoppingDistance = m_AttackDist;
-                ChangeAnim(AnimState.idle, 0.12f); // 만약에, 몬스터가 모션 도중, 이전 소유자가 나갔을 경우 idle 상태로 전환
-                if (CurHp <= 0.0f) // 만약, 몬스터가 죽음과 동시에 이전 소유자가 나갔을 경우, Die를 이어나감
+
+                // 만약, 몬스터가 죽는과 동시에 마스터 클라이언트가 바뀌었을 경우, 다시 한번 HP를 체크하여 죽었는지 알려준다.
+                if (CurHp <= 0)
                 {
-                    Debug.Log("만약, 몬스터가 죽음과 동시에 이전 소유자가 나갔을 경우, 들어오는 코루틴 함수");
-                    StartCoroutine(Die());
-                    CurHp = 0.0f;
+                    Debug.Log("마스터 클라이언트 변경과 동시에 사망!");
+                    ChangeAnim(AnimState.die, 0.12f);
+                    return;
                 }
+
+                Debug.Log("마스터 클라이언트 변경과 동시에 idle로 변경!");
+                ChangeAnim(AnimState.idle, 0.12f); // 만약에, 몬스터가 모션 도중, 이전 소유자가 나갔을 경우 idle 상태로 전환
             }
         }
         else

@@ -739,7 +739,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   speed: 8
   jumpPower: 7
-  MaxHp: 1000
+  MaxHp: 1000000
   pv: {fileID: 7874634244941095452}
   agent: {fileID: 7961057711358434984}
   id: {fileID: 1450886782558907756}
