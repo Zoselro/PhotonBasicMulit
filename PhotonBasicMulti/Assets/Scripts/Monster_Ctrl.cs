@@ -14,7 +14,7 @@ public enum MonType
 public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInstantiateMagicCallback
 {
     [Header("Components")]
-    [SerializeField] PhotonView pv = null; // Photon View 컴포넌트 할당 변수
+    [SerializeField] private PhotonView pv = null; // Photon View 컴포넌트 할당 변수
     [SerializeField] private Image ImgHpbar;
     [SerializeField] private NavMeshAgent nav;
     [SerializeField] private Text id;
@@ -33,16 +33,16 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
     [SerializeField] private float damage = 100f; // 공격 시 데미지 
 
     //--- Hp 바 표시
-    [SerializeField] float CurHp;
-    [SerializeField] float NetHp;
+    [SerializeField] private float CurHp;
+    [SerializeField] private float NetHp;
     string m_Id = "";
     //--- Hp 바 표시
 
     //--- 애니메이션
     [SerializeField] private Animator m_RefAnimator = null;
 
-    AnimState m_PreState = AnimState.idle; //애니메이션 변경을 위한 함수 
-    AnimState m_CurState = AnimState.idle; //애니메이션 변경을 위한 변수
+    private AnimState m_PreState = AnimState.idle; //애니메이션 변경을 위한 함수 
+    private AnimState m_CurState = AnimState.idle; //애니메이션 변경을 위한 변수
     //--- 애니메이션
 
     private Vector3 CurPos = Vector3.zero;
@@ -51,7 +51,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
     public int SpawnIdx => m_SpawnIdx;
 
     private bool isChase = false;
-    bool isFirstUpdate = true;
+    private bool isFirstUpdate = true;
     private void Start()
     {
         CurHp = MaxHp;
@@ -93,7 +93,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
 
         if(!pv.IsMine) // 다른 사람들의 화면(원격 아바타)일 경우
         {
-            // 플레이어 코드에서 했던 것처럼, 포톤으로 받아온 위치와 회전값을 동기화해 줍니다.
+            // 플레이어 코드에서 했던 것처럼, 포톤으로 받아온 위치와 회전값을 동기화
             if (10.0f < (transform.position - CurPos).magnitude)
             {
                 transform.position = CurPos;
@@ -105,7 +105,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
 
             transform.rotation = Quaternion.Slerp(transform.rotation, CurRot, Time.deltaTime * 10.0f);
 
-            // 원격 화면에서는 직접 움직이지 않으므로 NavMeshAgent의 위치 업데이트를 꺼둡니다.
+            // 원격 화면에서는 직접 움직이지 않으므로 NavMeshAgent의 위치 업데이트 끄기
             if (nav.enabled)
             {
                 nav.updatePosition = false;
@@ -186,7 +186,7 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
 
             if (distanceToTarget <= m_AttackDist)
             {
-                // ★ 2. 공격 시작! (이 함수 안에서 m_CurState가 attack으로 바뀝니다)
+                // 공격 시작 (이 함수 안에서 m_CurState가 attack으로 바뀜)
                 transform.LookAt(m_AggroTarget);
                 Attack();
             }
@@ -315,7 +315,6 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
             if (m_RefAnimator != null)
             {
                 m_RefAnimator.ResetTrigger(m_PreState.ToString());
-                //m_RefAnimator.SetTrigger(AnimState.idle.ToString());
                 m_RefAnimator.Play(AnimState.idle.ToString(), 0, 0f);
             }
 
