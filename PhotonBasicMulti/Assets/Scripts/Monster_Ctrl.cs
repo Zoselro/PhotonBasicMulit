@@ -196,8 +196,30 @@ public class Monster_Ctrl : MonoBehaviourPunCallbacks, IPunObservable, IPunInsta
                 nav.SetDestination(m_AggroTarget.position);
                 nav.isStopped = false;
                 ChangeAnim(AnimState.move, 0.12f);
+
+                //    // 플레이어 반대 방향으로 이동
+                //    Vector3 dir = (transform.position - m_AggroTarget.position).normalized;
+
+                //    // 너무 가까우면 계속 멀어지도록 목적지 계산
+                //    float runDistance = 10f;
+                //    Vector3 targetPos = transform.position + dir * runDistance;
+
+                //    // NavMesh 위의 위치인지 확인
+                //    NavMeshHit hit;
+                //    if (NavMesh.SamplePosition(targetPos, out hit, 3f, NavMesh.AllAreas))
+                //    {
+                //        nav.SetDestination(hit.position);
+                //        nav.isStopped = false;
+                //        ChangeAnim(AnimState.move, 0.12f);
+                //    }
+                //    else
+                //    {
+                //        // 갈 수 없는 곳이면 정지
+                //        nav.isStopped = true;
+                //        ChangeAnim(AnimState.idle, 0.12f);
+                //    }
+                }
             }
-        }
         else
         {
             // 타겟이 없거나 범위 밖이면 제자리에 정지
