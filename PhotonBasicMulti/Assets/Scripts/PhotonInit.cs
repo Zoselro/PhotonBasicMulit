@@ -303,7 +303,7 @@ public class PhotonInit : MonoBehaviourPunCallbacks
         // 씬을 이동하는 동안 포톤 클라이드 서버로부터 네크워크 메시지 수신 중단
         PhotonNetwork.IsMessageQueueRunning = false;
         // 백그라운드로 씬 로딩
-        AsyncOperation ao = SceneManager.LoadSceneAsync("GameScene"); // 로딩연출 할 때 쓰는 씬 (게이지바가 올라가는 거라던지..)
+        AsyncOperation ao = SceneManager.LoadSceneAsync("ColorSelectScene"); // 로딩연출 할 때 쓰는 씬 (게이지바가 올라가는 거라던지..)
         //AsyncOperation ao = SceneManager.LoadSceneAsync("GameScene");
         //AsyncOperation ao = SceneManager.LoadSceneAsync("SampleScene");
         yield return ao;

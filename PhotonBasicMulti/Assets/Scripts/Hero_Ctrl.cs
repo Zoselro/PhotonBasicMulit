@@ -9,6 +9,9 @@ public class Hero_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
     [SerializeField] private float speed;
     [SerializeField] private float jumpPower;
     [SerializeField] private float MaxHp;
+    [SerializeField] private LayerMask groundLayer = 1; // 착지 판정용 지형 레이어 (기본: Default)
+    [SerializeField] private float groundCheckOffset = 0.3f; // 레이캐스트 시작 높이 및 최소 검사 거리
+    [SerializeField] private float jumpFreezeNormalizedTime = 0.5f; // 착지 전까지 Jump 애니메이션을 멈춰둘 재생 지점
 
     [Header("Components")]
     [SerializeField] private PhotonView pv;
@@ -96,6 +99,7 @@ public class Hero_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
             CheckMovementInput(); // 이동 입력 체크
             CheckJumpInput(); // 점프 입력 체크
             CheckDodgeInput(); // 회피 입력 체크
+            HandleJumpAnimationHold(); // 착지 전까지 Jump 애니메이션이 끝까지 재생되지 않도록 고정
         }
         else // 원격지 아바타 캐릭터들은 위치, 회전, 애니메이션을 따라오게 동기화 처리
         {
@@ -116,26 +120,53 @@ public class Hero_Ctrl : MonoBehaviourPunCallbacks, IPunObservable
 
     private void ApplyGravity()
     {
-        if (isJump)
+        if (!isJump)
+            return;
+
+        yVelocity += gravity * Time.deltaTime; // 시간에 따라 아래로 떨어지는 가속도 증가
+
+        if (yVelocity >= 0f)
+            return; // 상승 중에는 착지 판정 불필요
+
+        // 발밑으로 레이캐스트를 쏴서, 이번 프레임에 떨어질 거리 안에 실제 지형이 있는지 검사
+        Vector3 rayOrigin = transform.position + Vector3.up * groundCheckOffset;
+        float rayDist = groundCheckOffset + Mathf.Abs(yVelocity) * Time.deltaTime;
+
+        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, rayDist, groundLayer))
         {
-            yVelocity += gravity * Time.deltaTime; // 시간에 따라 아래로 떨어지는 가속도 증가
-            // 바닥 충돌 임시 처리 (Y 좌표가 0 이하로 떨어지면 착지)
-            if (transform.position.y <= 0f && yVelocity < 0f)
+            Vector3 pos = transform.position;
+            pos.y = hit.point.y; // 고정된 0이 아니라 실제 지형 표면 높이로 착지
+            transform.position = pos;
+
+            isJump = false;
+            keepMovingAfterJump = false;
+            yVelocity = 0f;
+
+            if (m_Animator != null)
+                m_Animator.speed = 1f; // 공중에서 멈춰뒀던 애니메이션 재생 속도 복구
+
+            if (agent != null)
             {
-                Vector3 pos = transform.position;
-                pos.y = 0f;
-                transform.position = pos;
-
-                isJump = false;
-                keepMovingAfterJump = false;
-                yVelocity = 0f;
-
-                if (agent != null)
-                {
-                    agent.Warp(transform.position); // 에이전트 위치를 현재 착지한 곳으로 순간 이동시킴
-                    agent.updatePosition = true;    // 다시 바닥 고정 기능 활성화
-                }
+                agent.Warp(transform.position); // 에이전트 위치를 현재 착지한 곳으로 순간 이동시킴
+                agent.updatePosition = true;    // 다시 바닥 고정 기능 활성화
             }
+        }
+    }
+
+    // 착지하기 전에 Jump 애니메이션이 끝까지(착지 포즈까지) 재생되어 버리는 것을 막기 위해
+    // 정점 부근에서 재생을 멈추고 공중 자세를 유지시키는 함수
+    private void HandleJumpAnimationHold()
+    {
+        if (!isJump || m_Animator == null)
+            return;
+
+        AnimatorStateInfo state = m_Animator.GetCurrentAnimatorStateInfo(0);
+        if (!state.IsName("Jump"))
+            return;
+
+        if (m_Animator.speed > 0f && state.normalizedTime >= jumpFreezeNormalizedTime)
+        {
+            m_Animator.speed = 0f;
         }
     }
 
